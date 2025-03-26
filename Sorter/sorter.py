@@ -22,6 +22,7 @@ from pycoral.utils.dataset import read_label_file
 from pycoral.utils.edgetpu import make_interpreter
 from utils import CameraWebsocketHandler
 from utils.BiQuad import BiQuadFilter
+from utils.servo import MyServo
 from functools import partial
 from PIL import Image
 from scipy import ndimage
@@ -35,14 +36,14 @@ import argparse
 import sys
 import numpy as np
 import time
-try:
-    import RPi.GPIO as GPIO
-    GPIO.setwarnings(False)
-    GPIO.setmode(GPIO.BOARD)
-    GPIO.setup(sendPin, GPIO.OUT, initial=GPIO.LOW)
-except ImportError:
-    print("RPi.GPIO not found, skipping GPIO setup")
-    pass
+# try:
+# import RPi.GPIO as GPIO
+# GPIO.setwarnings(False)
+# GPIO.setmode(GPIO.BOARD)
+# GPIO.setup(sendPin, GPIO.OUT, initial=GPIO.LOW)
+# except ImportError:
+#     print("RPi.GPIO not found, skipping GPIO setup")
+#     pass
 # Path to edgetpu compatible model
 model_path = '../model_edgetpu.tflite'
 
@@ -52,17 +53,18 @@ sendPin = 7
 filter_type = 'zone'
 # biquad params : type, Fc, Q, peakGainDB
 bq = BiQuadFilter('band', 0.1, 0.707, 0.0)
+servo = MyServo(18)
 
 
 def send_over_ws(msg, cam_sockets):
     for ws in cam_sockets:
-        ws.write_message(msg)
+        # Send raw bytes instead of a string
+        ws.write_message(msg, binary=True)
 
 
 def format_img_tm2(cv_mat):
     ret, buf = cv2.imencode('.jpg', cv_mat)
-    encoded = base64.b64encode(buf)
-    return encoded.decode('ascii')
+    return buf.tobytes()  # Return raw binary data
 
 
 interpreter = make_interpreter(model_path)
@@ -148,9 +150,8 @@ def on_new_frame(cv_mat, mean, sliding_window, send_over_ws, cam_sockets):
             img_pil.resize((224, 224))
 
         if (mode == 'train'):
-            message = dict()
-            message['image'] = format_img_tm2(cv_mat)
-            message['shouldTakePicture'] = True
+            # No need for dict, just send bytes
+            message = format_img_tm2(cv_mat)
             send_over_ws(message, cam_sockets)
             # time.sleep(0.25) NOTE: debounce this at a rate depending on your singulation rate
 
@@ -166,8 +167,10 @@ def on_new_frame(cv_mat, mean, sliding_window, send_over_ws, cam_sockets):
                 if label_id == 0 and confidence > 0.95:
                     # GPIO.output(sendPin, GPIO.HIGH)
                     # print("Coin 0")
+                    servo.min()
                     pass
                 else:
+                    servo.max()
                     pass
                     # print("Coin 1")
                     # GPIO.output(sendPin, GPIO.LOW)
@@ -183,6 +186,8 @@ if __name__ == '__main__':
     mode_parser = parser.add_mutually_exclusive_group(required=False)
     mode_parser.add_argument('--train', dest='will_sort', action='store_false')
     mode_parser.add_argument('--sort', dest='will_sort', action='store_true')
+
+    parser.add_argument('--debug', dest='debug', action='store_true')
 
     filter_parse = parser.add_mutually_exclusive_group(required=False)
     filter_parse.add_argument(
@@ -231,7 +236,7 @@ if __name__ == '__main__':
         print("Initializing Flir Camera")
         cam = FLIR.FlirBFS(on_new_frame=partial(on_new_frame, mean=mean, sliding_window=sliding_window,
                                                 send_over_ws=send_over_ws, cam_sockets=cam_sockets),
-                           display=True, frame_rate=120)
+                           display=args.debug, frame_rate=120)
         cam.run_cam()
     elif (args.arducam):
         raise Exception("Arducam Support Coming")
@@ -253,7 +258,8 @@ if __name__ == '__main__':
             pil_im = Image.fromarray(cv2_im)
             pil_im.resize((224, 224))
             pil_im.transpose(Image.FLIP_LEFT_RIGHT)
-            cv2.imshow('frame', cv2_im)
+            if args.debug:
+                cv2.imshow('frame', cv2_im)
             on_new_frame(cv2_im, mean, sliding_window,
                          send_over_ws, cam_sockets)
             # if cv2.waitKey(1) & 0xff == ord('q'):

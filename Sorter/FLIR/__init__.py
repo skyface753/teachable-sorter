@@ -14,6 +14,4 @@
 
 import PySpin
 import cv2
-from .flir import FlirBFS
-
-
+from .FLIR import FlirBFS

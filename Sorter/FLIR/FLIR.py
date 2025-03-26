@@ -13,6 +13,13 @@
 # limitations under the License.
 import PySpin
 import cv2
+import logging
+
+# initialize logging for this module
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
+
+
 class FlirBFS(object):
     # takes in a mode, a path to a model, and a callback function that gets called each new frame
     def __init__(self, on_new_frame=None, frame_rate=120, display=False):
@@ -21,6 +28,10 @@ class FlirBFS(object):
         self.frame_rate = frame_rate
         self.display = display
         self.on_new_frame = on_new_frame
+        self.processor = PySpin.ImageProcessor()
+        # TODO: SEE THIS Set default image processor color processing method
+        self.processor.SetColorProcessing(
+            PySpin.SPINNAKER_COLOR_PROCESSING_ALGORITHM_HQ_LINEAR)
         if len(self.cam_list) == 0:
             raise Exception('No FLIR camera connected!')
 
@@ -50,6 +61,20 @@ class FlirBFS(object):
         except PySpin.SpinnakerException as ex:
             print('Error {}'.format(ex))
 
+    def log_device_info(self):
+        log.info("*** DEVICE INFORMATION ***")
+        node_device_information = PySpin.CCategoryPtr(
+            self.nodemap_tldevice.GetNode('DeviceInformation'))
+
+        if PySpin.IsReadable(node_device_information):
+            features = node_device_information.GetFeatures()
+            for feature in features:
+                node_feature = PySpin.CValuePtr(feature)
+                log.info('%s: %s', node_feature.GetName(),
+                         node_feature.ToString() if PySpin.IsReadable(node_feature) else 'Node not readable')
+        else:
+            log.warning("Device control information not readable.")
+
     def acquire_images(self, nodemap, stream_nodemap):
 
         self.cam.BeginAcquisition()
@@ -58,11 +83,16 @@ class FlirBFS(object):
             try:
                 image_result = self.cam.GetNextImage()
                 if image_result.IsIncomplete():
-                    print('Image incomplete with image status {} ...'.format(image_result.GetImageStatus()))
+                    print('Image incomplete with image status {} ...'.format(
+                        image_result.GetImageStatus()))
                 else:
-                    color_image = image_result.Convert(PySpin.PixelFormat_BGR8, PySpin.HQ_LINEAR)
+                    # TODO: SEE THIS https://softwareservices.flir.com/Spinnaker/latest/group___camera_defs__h.html#gabd5af55aaa20bcb0644c46241c2cbad1
+                    # TODO: SEE THIS https://courses.ideate.cmu.edu/16-375/f2023/Python/theater/hallway-monitor.py
+                    color_image = self.processor.Convert(image_result,
+                                                         PySpin.PixelFormat_BGR8)
                     open_cv_mat = color_image.GetNDArray()
                     open_cv_mat = cv2.cvtColor(open_cv_mat, cv2.COLOR_BGR2RGB)
+                    image_result.Release()
                     if (self.on_new_frame != None):
                         self.on_new_frame(cv_mat=open_cv_mat)
 
@@ -78,3 +108,8 @@ class FlirBFS(object):
 
                 # Release system instance
                 self.system.ReleaseInstance()
+
+
+if __name__ == "__main__":
+    cam = FlirBFS()
+    cam.log_device_info()
