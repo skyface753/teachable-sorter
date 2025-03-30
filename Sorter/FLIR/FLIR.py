@@ -36,11 +36,27 @@ class FlirBFS(object):
             raise Exception('No FLIR camera connected!')
 
         self.cam = self.cam_list[0]
+        self.cam.Init()
+
+    def get_supported_pixel_formats(self):
+        supported_formats = []
+        try:
+            node_pixel_format = PySpin.CEnumerationPtr(
+                self.cam.GetNodeMap().GetNode("PixelFormat"))
+            if node_pixel_format is not None and PySpin.IsAvailable(node_pixel_format) and PySpin.IsReadable(node_pixel_format):
+                entries = node_pixel_format.GetEntries()
+                for entry in entries:
+                    entry_symbolic = PySpin.CEnumEntryPtr(entry)
+                    if entry_symbolic is not None and PySpin.IsAvailable(entry_symbolic) and PySpin.IsReadable(entry_symbolic):
+                        supported_formats.append(entry_symbolic.GetSymbolic())
+        except Exception as e:
+            print(f"Fehler beim Abrufen der unterstützten Pixelformate: {e}")
+
+        return supported_formats
 
     # This function pre configures camera settings on the flir.
     def run_cam(self):
         try:
-            self.cam.Init()
 
             # self.nodemap_tldevice = cam.GetTLdeviceNodeMap()
             nodemap = self.cam.GetNodeMap()
@@ -57,28 +73,48 @@ class FlirBFS(object):
                 'NewestOnly')
             handling_mode.SetIntValue(handling_mode_entry.GetValue())
 
+            # From Julian: https://github.com/ITLab-CC/Sorter/blob/main/capture_process.py
+            # pixel_format_enum = PySpin.CEnumerationPtr(
+            #     self.cam.GetNodeMap().GetNode("PixelFormat"))
+            # pixel_format_bayerrg8 = pixel_format_enum.GetEntryByName(
+            #     "BayerRG8")
+            # pixel_format_enum.SetIntValue(pixel_format_bayerrg8.GetValue())
+
+            ### Set Pixel Format to BGR8 ###
+            node_pixel_format = PySpin.CEnumerationPtr(
+                nodemap.GetNode('PixelFormat'))
+            error = False
+            if not PySpin.IsAvailable(node_pixel_format):
+                print(
+                    'Unavailable Pixel Format. Aborting...')
+                error = True
+            if not PySpin.IsWritable(node_pixel_format):
+                print('Unable to set Pixel Format to BGR8 (enum retrieval). Aborting...')
+                error = True
+            node_pixel_format_BGR8 = node_pixel_format.GetEntryByName('BGR8')
+            if not PySpin.IsAvailable(node_pixel_format_BGR8):
+                print(
+                    'Pixel Format BGR8 not available. Aborting...')
+                error = True
+            if not PySpin.IsReadable(node_pixel_format_BGR8):
+                print(
+                    'Unable to set Pixel Format to BGR8 (entry retrieval). Aborting...')
+                error = True
+            if not error:
+                pixel_format_BGR8 = node_pixel_format_BGR8.GetValue()
+                node_pixel_format.SetIntValue(pixel_format_BGR8)
+
             self.acquire_images(nodemap, stream_nodemap)
         except PySpin.SpinnakerException as ex:
             print('Error {}'.format(ex))
 
-    def log_device_info(self):
-        log.info("*** DEVICE INFORMATION ***")
-        node_device_information = PySpin.CCategoryPtr(
-            self.nodemap_tldevice.GetNode('DeviceInformation'))
-
-        if PySpin.IsReadable(node_device_information):
-            features = node_device_information.GetFeatures()
-            for feature in features:
-                node_feature = PySpin.CValuePtr(feature)
-                log.info('%s: %s', node_feature.GetName(),
-                         node_feature.ToString() if PySpin.IsReadable(node_feature) else 'Node not readable')
-        else:
-            log.warning("Device control information not readable.")
-
     def acquire_images(self, nodemap, stream_nodemap):
 
         self.cam.BeginAcquisition()
-
+        # Überprüfe das aktuelle Bildformat
+        current_pixel_format = PySpin.CEnumerationPtr(
+            self.cam.GetNodeMap().GetNode("PixelFormat")).GetCurrentEntry()
+        print("Aktuelles Bildformat:", current_pixel_format.GetSymbolic())
         while True:
             try:
                 image_result = self.cam.GetNextImage()
@@ -88,10 +124,11 @@ class FlirBFS(object):
                 else:
                     # TODO: SEE THIS https://softwareservices.flir.com/Spinnaker/latest/group___camera_defs__h.html#gabd5af55aaa20bcb0644c46241c2cbad1
                     # TODO: SEE THIS https://courses.ideate.cmu.edu/16-375/f2023/Python/theater/hallway-monitor.py
-                    color_image = self.processor.Convert(image_result,
-                                                         PySpin.PixelFormat_BGR8)
-                    open_cv_mat = color_image.GetNDArray()
-                    open_cv_mat = cv2.cvtColor(open_cv_mat, cv2.COLOR_BGR2RGB)
+                    # color_image = self.processor.Convert(image_result,
+                    #  PySpin.PixelFormat_BGR8)
+                    open_cv_mat = image_result.GetNDArray()
+                    open_cv_mat = cv2.cvtColor(
+                        open_cv_mat, cv2.COLOR_BGR2RGB)
                     image_result.Release()
                     if (self.on_new_frame != None):
                         self.on_new_frame(cv_mat=open_cv_mat)
@@ -111,5 +148,5 @@ class FlirBFS(object):
 
 
 if __name__ == "__main__":
-    cam = FlirBFS()
-    cam.log_device_info()
+    flircam = FlirBFS(display=True)
+    flircam.run_cam()

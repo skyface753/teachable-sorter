@@ -1,6 +1,13 @@
 ## Train
 
+Coins:
 https://teachablemachine.withgoogle.com/train/image/1FsMQauZdUvkO1DCY1AiGVlOUeKQYNtEN
+
+Balls:
+https://teachablemachine.withgoogle.com/train/image/1onSVriAxYLNihy_weE4JKnwiaLM7AR-0
+
+Colab Train:
+https://colab.research.google.com/github/google-coral/tutorials/blob/master/retrain_classification_ptq_tf2.ipynb
 
 Save as `model_edgetpu.tflite` and `labels.txt` in root directory.
 

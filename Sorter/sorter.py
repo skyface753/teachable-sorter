@@ -22,7 +22,7 @@ from pycoral.utils.dataset import read_label_file
 from pycoral.utils.edgetpu import make_interpreter
 from utils import CameraWebsocketHandler
 from utils.BiQuad import BiQuadFilter
-from utils.servo import MyServo
+
 from functools import partial
 from PIL import Image
 from scipy import ndimage
@@ -49,11 +49,10 @@ model_path = '../model_edgetpu.tflite'
 
 # NOTE: can either be 'train' to classify images using edgetpu or 'sort' to just send images to TM2
 mode = "sort"
-sendPin = 7
+# sendPin = 7
 filter_type = 'zone'
 # biquad params : type, Fc, Q, peakGainDB
 bq = BiQuadFilter('band', 0.1, 0.707, 0.0)
-servo = MyServo(18)
 
 
 def send_over_ws(msg, cam_sockets):
@@ -137,7 +136,7 @@ def is_good_photo(img, width, height, mean, sliding_window):
 
 
 # call each time you  have a new frame
-def on_new_frame(cv_mat, mean, sliding_window, send_over_ws, cam_sockets):
+def on_new_frame(cv_mat, mean, sliding_window, send_over_ws, cam_sockets, disable_servo=False, debug=False):
     img_pil = Image.fromarray(cv_mat)
 
     width, height = img_pil.size
@@ -148,7 +147,10 @@ def on_new_frame(cv_mat, mean, sliding_window, send_over_ws, cam_sockets):
         # to that size. so we have to make sure our edgetpu converted model is fed similar images.
         if (width, height) != (224, 224):
             img_pil.resize((224, 224))
-
+        if debug:
+            img = np.array(img_pil)
+            cv2.imshow('good_frame', img)
+            cv2.waitKey(1)
         if (mode == 'train'):
             # No need for dict, just send bytes
             message = format_img_tm2(cv_mat)
@@ -167,11 +169,11 @@ def on_new_frame(cv_mat, mean, sliding_window, send_over_ws, cam_sockets):
                 if label_id == 0 and confidence > 0.95:
                     # GPIO.output(sendPin, GPIO.HIGH)
                     # print("Coin 0")
-                    servo.min()
-                    pass
+                    if not disable_servo:
+                        servo.min()
                 else:
-                    servo.max()
-                    pass
+                    if not disable_servo:
+                        servo.max()
                     # print("Coin 1")
                     # GPIO.output(sendPin, GPIO.LOW)
 
@@ -203,6 +205,9 @@ if __name__ == '__main__':
     camera_parse.add_argument('--opencv', dest='opencv', action='store_true')
     camera_parse.add_argument('--arducam', dest='arducam', action='store_true')
 
+    parser.add_argument('--disable-servo',
+                        dest='disable_servo', action='store_true')
+
     parser.set_defaults(will_sort=True)
     args = parser.parse_args()
 
@@ -217,6 +222,10 @@ if __name__ == '__main__':
         mode = "sort"
     else:
         mode = "train"
+
+    if not args.disable_servo:
+        from utils.servo import MyServo
+        servo = MyServo(18)
 
     #  parse filter type
     if args.zone:
@@ -235,7 +244,7 @@ if __name__ == '__main__':
         import FLIR
         print("Initializing Flir Camera")
         cam = FLIR.FlirBFS(on_new_frame=partial(on_new_frame, mean=mean, sliding_window=sliding_window,
-                                                send_over_ws=send_over_ws, cam_sockets=cam_sockets),
+                                                send_over_ws=send_over_ws, cam_sockets=cam_sockets, disable_servo=args.disable_servo),
                            display=args.debug, frame_rate=120)
         cam.run_cam()
     elif (args.arducam):
@@ -261,7 +270,7 @@ if __name__ == '__main__':
             if args.debug:
                 cv2.imshow('frame', cv2_im)
             on_new_frame(cv2_im, mean, sliding_window,
-                         send_over_ws, cam_sockets)
+                         send_over_ws, cam_sockets, disable_servo=args.disable_servo)
             # if cv2.waitKey(1) & 0xff == ord('q'):
             #     break
             # stock image change by key
