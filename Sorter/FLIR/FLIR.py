@@ -124,6 +124,7 @@ class FlirBFS(object):
                 else:
                     # TODO: SEE THIS https://softwareservices.flir.com/Spinnaker/latest/group___camera_defs__h.html#gabd5af55aaa20bcb0644c46241c2cbad1
                     # TODO: SEE THIS https://courses.ideate.cmu.edu/16-375/f2023/Python/theater/hallway-monitor.py
+                    open_cv_mat = image_result.GetNDArray()
                     # color_image = self.processor.Convert(image_result,
                     #  PySpin.PixelFormat_BGR8)
                     #open_cv_mat = cv2.cvtColor(
