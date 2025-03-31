@@ -126,9 +126,8 @@ class FlirBFS(object):
                     # TODO: SEE THIS https://courses.ideate.cmu.edu/16-375/f2023/Python/theater/hallway-monitor.py
                     # color_image = self.processor.Convert(image_result,
                     #  PySpin.PixelFormat_BGR8)
-                    open_cv_mat = image_result.GetNDArray()
-                    open_cv_mat = cv2.cvtColor(
-                        open_cv_mat, cv2.COLOR_BGR2RGB)
+                    #open_cv_mat = cv2.cvtColor(
+                    #    open_cv_mat, cv2.COLOR_BGR2RGB)
                     image_result.Release()
                     if (self.on_new_frame != None):
                         self.on_new_frame(cv_mat=open_cv_mat)

@@ -45,7 +45,7 @@ import time
 #     print("RPi.GPIO not found, skipping GPIO setup")
 #     pass
 # Path to edgetpu compatible model
-model_path = '../model_edgetpu.tflite'
+model_path = '../balls_model_edgetpu.tflite'
 
 # NOTE: can either be 'train' to classify images using edgetpu or 'sort' to just send images to TM2
 mode = "sort"
@@ -68,7 +68,7 @@ def format_img_tm2(cv_mat):
 
 interpreter = make_interpreter(model_path)
 interpreter.allocate_tensors()
-labels = read_label_file('../labels.txt')  # Adjust path if needed
+labels = read_label_file('../balls_labels.txt')  # Adjust path if needed
 
 
 def classify_image(image):
