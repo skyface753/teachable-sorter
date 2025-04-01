@@ -18,10 +18,12 @@ Refer to the [official documentation](https://coral.ai/projects/teachable-sorter
 
 ### Prepare the SSH Connection
 
+`CMD` öffnen
+
 SSH to the Raspi with a port forward:
 
 ```bash
-ssh -L 8889:localhost:8889 pi@sorter.it-lab.cc -i ~/.ssh/sorter
+ssh -L 8889:localhost:8889 pi@sorter.it-lab.cc -i <path_to_key>
 ```
 
 > Note: The key is not included in the repository.
@@ -56,6 +58,11 @@ Create a new project and add the following to the url
 ```
 
 Now you can train the model with the images from the camera.
+
+1. Click on `network` in the classes section and select `localhost:8889`.
+2. Train the Model
+3. Click on `Export Model` and select `Tensorflow Lite` and `Edge TPU`.
+4. Download the model and labels file.
 
 #### Pretrained models by Skyface753
 
