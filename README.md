@@ -1,4 +1,63 @@
+# Teachable Sorter
+
+This project is a sorter for objects using a camera and a Coral USB Accelerator. The sorter can be trained with the Teachable Machine and then used to sort objects.
+
+## Activate the Environment
+
+To activate the previously created environment, use the following command on the `sorter` machine:
+
+> Note: To create a new environment, refer to the [install on Raspi section](#install-on-raspi).
+
+```bash
+pyenv activate venv_myprojecta
+```
+
 ## Train
+
+Refer to the [official documentation](https://coral.ai/projects/teachable-sorter#step-4-connect-to-teachable-machine) for a detailed explanation.
+
+### Prepare the SSH Connection
+
+SSH to the Raspi with a port forward:
+
+```bash
+ssh -L 8889:localhost:8889 pi@sorter.it-lab.cc -i ~/.ssh/sorter
+```
+
+> Note: The key is not included in the repository.
+
+### Start the Sorter in Train Mode
+
+Activate the environment:
+
+```bash
+pyenv activate venv_myprojecta
+```
+
+Start the training:
+
+```bash
+cd teachable-sorter/Sorter
+python sorter.py --train --flir --biquad
+```
+
+### Open the Teachable Machine with the Port Forward
+
+Open teachable machine in the browser:
+
+```bash
+https://teachablemachine.withgoogle.com
+```
+
+Create a new project and add the following to the url
+
+```bash
+?network=true
+```
+
+Now you can train the model with the images from the camera.
+
+#### Pretrained models by Skyface753
 
 Coins:
 https://teachablemachine.withgoogle.com/train/image/1FsMQauZdUvkO1DCY1AiGVlOUeKQYNtEN
@@ -9,19 +68,44 @@ https://teachablemachine.withgoogle.com/train/image/1onSVriAxYLNihy_weE4JKnwiaLM
 Colab Train:
 https://colab.research.google.com/github/google-coral/tutorials/blob/master/retrain_classification_ptq_tf2.ipynb
 
+### Save the Model
+
 Save as `model_edgetpu.tflite` and `labels.txt` in root directory.
+
+## Run the Sorter
+
+### Activate the Environment
+
+```bash
+pyenv activate venv_myprojecta
+```
+
+### Run the Sorter
+
+```bash
+python sorter.py --sort --flir --biquad
+```
+
+You can also use `--debug` to show the debug display.
+
+## Arguments
+
+| Argument          | Description                               |
+| ----------------- | ----------------------------------------- |
+| --sort            | Sort the objects (counterpart to --train) |
+| --train           | Train the model (counterpart to --sort)   |
+| --flir            | Use the Flir camera                       |
+| --opencv          | Use the OpenCV camera                     |
+| --biquad          | Use the Biquad filter for sorting         |
+| --biquad2         | Use the Biquad2 filter for sorting        |
+| --center_of_mass  | Use the center of mass for sorting        |
+| --zone-activation | Use the zone activation for sorting       |
+| --debug           | Show debug display                        |
 
 ## Eval
 
 ```bash
 python eval.py --model model_edgetpu.tflite --dataset dataset/test/ --labels labels.txt
-```
-
-## Run Sorter
-
-```bash
-cd Sorter
-python sorter.py --opencv --biquad
 ```
 
 ## Install on Raspi
@@ -87,13 +171,4 @@ Sorter
 git clone https://github.com/skyface753/teachable-sorter.git
 cd teachable-sorter
 pip install -r a.txt
-```
-
-## Run on Raspi
-
-```bash
-cd teachable-sorter
-cd Sorter
-pyenv activate sorter
-python sorter.py --flir
 ```
