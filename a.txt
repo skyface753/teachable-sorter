@@ -1,5 +1,5 @@
 Pillow
-tornado==6.0.3
+tornado==6.4.2
 scipy
 opencv-python
 gpiozero
